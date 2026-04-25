@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"/></head>
+<body>
+<script type="module">
+import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2.3.0/+esm";
+
+const EXT_ID   = "com.gm.hidden-tokens";
+const META_KEY = `${EXT_ID}/hidden`;
+
+// ─── SVG overlay markup injected into the GM's viewport ───────────────────
+const EYE_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+     fill="none" stroke="white" stroke-width="2.2"
+     stroke-linecap="round" stroke-linejoin="round">
+  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8
+           a18.45 18.45 0 0 1 5.06-5.94"/>
+  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8
+           a18.5 18.5 0 0 1-2.16 3.19"/>
+  <line x1="1" y1="1" x2="23" y2="23"/>
+</svg>`;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+function isHidden(item) {
+  return !!item.metadata?.[META_KEY];
+}
+
+// ─── Toggle hidden state on selected tokens ───────────────────────────────
+async function toggleHidden(ids) {
+  const items = await OBR.scene.items.getItems(ids);
+  await OBR.scene.items.updateItems(ids, (itemsToUpdate) => {
+    itemsToUpdate.forEach((item, i) => {
+      const nowHidden = !isHidden(items[i]);
+      item.metadata[META_KEY] = nowHidden;
+      // Make invisible to everyone in Owlbear – extension handles GM view
+      item.visible = !nowHidden;
+    });
+  });
+}
+
+// ─── Overlay layer: shows eye icons for GM on hidden tokens ───────────────
+let overlayContainer = null;
+
+function ensureOverlayContainer() {
+  if (overlayContainer) return overlayContainer;
+  const div = document.createElement("div");
+  div.id = "gm-hidden-overlay";
+  div.style.cssText = `
+    position: fixed; inset: 0; pointer-events: none;
+    z-index: 99999; overflow: hidden;
+  `;
+  document.body.appendChild(div);
+  overlayContainer = div;
+  return div;
+}
+
+async function refreshOverlay() {
+  const isGM = await OBR.player.getRole() === "GM";
+  if (!isGM) return;
+
+  const container = ensureOverlayContainer();
+  container.innerHTML = "";
+
+  // Get all hidden items
+  const allItems = await OBR.scene.items.getItems();
+  const hiddenItems = allItems.filter(isHidden);
+  if (!hiddenItems.length) return;
+
+  // Get viewport transform to convert scene coords → screen coords
+  const viewport = await OBR.viewport.getTransform();
+  const scale = viewport.scale;
+  const tx    = viewport.position.x;
+  const ty    = viewport.position.y;
+
+  hiddenItems.forEach(item => {
+    const pos = item.position;
+    // Convert scene position to screen position
+    const screenX = pos.x * scale + tx;
+    const screenY = pos.y * scale + ty;
+
+    // Estimate token screen size from scale + item scale
+    const itemScale = item.scale?.x ?? 1;
+    const dpi = item.grid?.dpi ?? 150; // Owlbear default grid dpi
+    const tokenSize = dpi * itemScale * scale;
+
+    // Wrapper: full token footprint with eye icon centered
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = `
+      position: absolute;
+      left:   ${screenX - tokenSize / 2}px;
+      top:    ${screenY - tokenSize / 2}px;
+      width:  ${tokenSize}px;
+      height: ${tokenSize}px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+
+    // Eye badge
+    const badge = document.createElement("div");
+    const badgeSize = Math.max(18, Math.min(tokenSize * 0.38, 44));
+    badge.style.cssText = `
+      width:  ${badgeSize}px;
+      height: ${badgeSize}px;
+      background: rgba(30,30,40,0.72);
+      border: 1.5px solid rgba(255,255,255,0.55);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.55);
+      backdrop-filter: blur(2px);
+    `;
+    const iconSize = badgeSize * 0.6;
+    badge.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg"
+      width="${iconSize}" height="${iconSize}"
+      viewBox="0 0 24 24" fill="none"
+      stroke="white" stroke-width="2.2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8
+               a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8
+               a18.5 18.5 0 0 1-2.16 3.19"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>`;
+
+    wrapper.appendChild(badge);
+    container.appendChild(wrapper);
+  });
+}
+
+// ─── Main init ────────────────────────────────────────────────────────────
+OBR.onReady(async () => {
+  const role = await OBR.player.getRole();
+
+  // ── Context menu (GM only) ──
+  if (role === "GM") {
+    OBR.contextMenu.create({
+      id: `${EXT_ID}/toggle`,
+      icons: [
+        {
+          // Icon when token is NOT hidden – clicking will hide it
+          icon: "https://api.iconify.design/lucide/eye-off.svg?color=white",
+          label: "Skjul for spillere",
+          filter: {
+            every: [
+              { key: ["metadata", META_KEY], value: undefined, coordinator: "||" },
+              { key: ["metadata", META_KEY], value: false }
+            ]
+          }
+        },
+        {
+          // Icon when token IS hidden – clicking will reveal it
+          icon: "https://api.iconify.design/lucide/eye.svg?color=white",
+          label: "Vis for spillere",
+          filter: {
+            every: [
+              { key: ["metadata", META_KEY], value: true }
+            ]
+          }
+        }
+      ],
+      onClick(context) {
+        toggleHidden(context.items.map(i => i.id));
+      }
+    });
+
+    // ── Overlay: update on scene/viewport changes ──
+    OBR.scene.items.onChange(() => refreshOverlay());
+    OBR.viewport.onChange(() => refreshOverlay());
+
+    // Initial render
+    const sceneReady = await OBR.scene.isReady();
+    if (sceneReady) refreshOverlay();
+    OBR.scene.onReadyChange(ready => { if (ready) refreshOverlay(); });
+  }
+
+  // ── For players: enforce invisibility of GM-hidden tokens ──
+  // (Owlbear already hides them via visible:false, this is a safety net)
+  if (role === "PLAYER") {
+    OBR.scene.items.onChange(async (items) => {
+      // If any hidden token somehow became visible (e.g. sync edge case), hide it
+      const leaking = items.filter(i => isHidden(i) && i.visible);
+      if (leaking.length) {
+        await OBR.scene.items.updateItems(
+          leaking.map(i => i.id),
+          (toFix) => toFix.forEach(i => { i.visible = false; })
+        );
+      }
+    });
+  }
+});
+</script>
+</body>
+</html>
