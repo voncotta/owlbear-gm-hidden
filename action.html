@@ -25,9 +25,10 @@
 <script type="module">
 import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2.3.0/+esm";
 
-const EXT_ID   = "com.gm.hidden-tokens";
-const META_KEY = `${EXT_ID}/hidden`;
-const BASE_URL = "https://voncotta.github.io/owlbear-gm-hidden";
+const EXT_ID     = "com.gm.hidden-tokens";
+const META_KEY   = `${EXT_ID}/hidden`;
+const META_LAYER = `${EXT_ID}/originalLayer`;
+const BASE_URL   = "https://voncotta.github.io/owlbear-gm-hidden";
 
 function isHidden(item) {
   return !!item.metadata?.[META_KEY];
@@ -39,7 +40,14 @@ async function toggleHidden(ids) {
     itemsToUpdate.forEach((item, i) => {
       const nowHidden = !isHidden(items[i]);
       item.metadata[META_KEY] = nowHidden;
-      item.visible = !nowHidden;
+      if (nowHidden) {
+        item.metadata[META_LAYER] = items[i].layer;
+        item.layer = "GM";
+      } else {
+        const original = items[i].metadata?.[META_LAYER] || "CHARACTER";
+        item.layer = original;
+        item.metadata[META_LAYER] = undefined;
+      }
     });
   });
 }
@@ -48,7 +56,6 @@ OBR.onReady(async () => {
   const role = await OBR.player.getRole();
   if (role !== "GM") return;
 
-  // Registrer kontekstmenu
   OBR.contextMenu.create({
     id: `${EXT_ID}/toggle`,
     icons: [
