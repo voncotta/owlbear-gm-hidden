@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+  body {
+    margin: 0;
+    background: #1a1a2e;
+    color: #ccc;
+    font-family: sans-serif;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 60px;
+    text-align: center;
+    padding: 0 12px;
+  }
+  p { margin: 0; opacity: 0.7; }
+</style>
+</head>
+<body>
+<p>Højreklik på et token<br/>for at skjule det for spillere</p>
+
+<script type="module">
+import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2.3.0/+esm";
+
+const EXT_ID   = "com.gm.hidden-tokens";
+const META_KEY = `${EXT_ID}/hidden`;
+const BASE_URL = "https://voncotta.github.io/owlbear-gm-hidden";
+
+function isHidden(item) {
+  return !!item.metadata?.[META_KEY];
+}
+
+async function toggleHidden(ids) {
+  const items = await OBR.scene.items.getItems(ids);
+  await OBR.scene.items.updateItems(ids, (itemsToUpdate) => {
+    itemsToUpdate.forEach((item, i) => {
+      const nowHidden = !isHidden(items[i]);
+      item.metadata[META_KEY] = nowHidden;
+      item.visible = !nowHidden;
+    });
+  });
+}
+
+OBR.onReady(async () => {
+  const role = await OBR.player.getRole();
+  if (role !== "GM") return;
+
+  // Registrer kontekstmenu
+  OBR.contextMenu.create({
+    id: `${EXT_ID}/toggle`,
+    icons: [
+      {
+        icon: `${BASE_URL}/eye-off.svg`,
+        label: "Skjul for spillere",
+        filter: {
+          every: [
+            { key: ["metadata", META_KEY], value: true, operator: "!=" }
+          ]
+        }
+      },
+      {
+        icon: `${BASE_URL}/eye.svg`,
+        label: "Vis for spillere",
+        filter: {
+          every: [
+            { key: ["metadata", META_KEY], value: true }
+          ]
+        }
+      }
+    ],
+    onClick(context) {
+      toggleHidden(context.items.map(i => i.id));
+    }
+  });
+});
+</script>
+</body>
+</html>

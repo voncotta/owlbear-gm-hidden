@@ -1,10 +1,14 @@
 {
   "name": "GM Hidden Tokens",
-  "description": "Mark tokens as hidden for players. GM sees them at full opacity with a closed-eye indicator.",
+  "description": "Skjul tokens for spillere. GM ser dem med fuld opacitet og et lukket øje-ikon.",
   "author": "GM",
   "version": "1.0.0",
   "manifest_version": 1,
-  "background": {
-    "url": "/background.html"
+  "action": {
+    "title": "GM Hidden Tokens",
+    "icon": "https://voncotta.github.io/owlbear-gm-hidden/eye-off.svg",
+    "popover": "https://voncotta.github.io/owlbear-gm-hidden/action.html",
+    "height": 60,
+    "width": 200
   }
 }
