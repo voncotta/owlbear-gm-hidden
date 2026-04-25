@@ -1,6 +1,6 @@
 {
   "name": "GM Hidden Tokens",
-  "description": "Skjul tokens for spillere. GM ser dem med fuld opacitet og et lukket øje-ikon.",
+  "description": "Skjul tokens for spillere. GM ser dem med et lukket øje-ikon.",
   "author": "GM",
   "version": "1.0.0",
   "manifest_version": 1,
