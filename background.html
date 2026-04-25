@@ -8,6 +8,9 @@ import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2.3.0/+esm";
 const EXT_ID   = "com.gm.hidden-tokens";
 const META_KEY = `${EXT_ID}/hidden`;
 
+// !! Sæt din GitHub Pages URL her (uden afsluttende slash) !!
+const BASE_URL = "https://DIT-BRUGERNAVN.github.io/owlbear-gm-hidden";
+
 // ─── SVG overlay markup injected into the GM's viewport ───────────────────
 const EYE_SVG = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
@@ -139,19 +142,18 @@ OBR.onReady(async () => {
       id: `${EXT_ID}/toggle`,
       icons: [
         {
-          // Icon when token is NOT hidden – clicking will hide it
-          icon: "https://api.iconify.design/lucide/eye-off.svg?color=white",
+          // Vises når token IKKE er skjult → klik skjuler den
+          icon: `${BASE_URL}/eye-off.svg`,
           label: "Skjul for spillere",
           filter: {
             every: [
-              { key: ["metadata", META_KEY], value: undefined, coordinator: "||" },
-              { key: ["metadata", META_KEY], value: false }
+              { key: ["metadata", META_KEY], value: true, operator: "!=" }
             ]
           }
         },
         {
-          // Icon when token IS hidden – clicking will reveal it
-          icon: "https://api.iconify.design/lucide/eye.svg?color=white",
+          // Vises når token ER skjult → klik viser den igen
+          icon: `${BASE_URL}/eye.svg`,
           label: "Vis for spillere",
           filter: {
             every: [
